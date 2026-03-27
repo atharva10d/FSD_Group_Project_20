@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #0f172a; /* darkBg */
+  color: #f8fafc; /* text-slate-50 */
+}
+
+/* Base Input styling */
+input, select {
+  @apply bg-slate-800 border-slate-700 text-white rounded-md px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all;
+}
+
+button {
+  @apply transition-all duration-300;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
