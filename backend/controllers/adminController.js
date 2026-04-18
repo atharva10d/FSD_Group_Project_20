@@ -15,8 +15,18 @@ const addFlight = async (req, res) => {
 
 const updateFlight = async (req, res) => {
     try {
-        const flight = await Flight.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        res.json(flight);
+        const flight = await Flight.findById(req.params.id);
+        if (!flight) return res.status(404).json({ message: 'Flight not found' });
+        
+        // If totalSeats is changing, adjust availableSeats proportionally
+        if (req.body.totalSeats && req.body.totalSeats !== flight.totalSeats) {
+            const bookedSeats = flight.totalSeats - flight.availableSeats;
+            req.body.availableSeats = req.body.totalSeats - bookedSeats;
+            if (req.body.availableSeats < 0) req.body.availableSeats = 0;
+        }
+        
+        const updatedFlight = await Flight.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.json(updatedFlight);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -33,7 +43,7 @@ const deleteFlight = async (req, res) => {
 
 const getReports = async (req, res) => {
     try {
-        const totalBookings = await Reservation.countDocuments();
+        const totalBookings = await Reservation.countDocuments({ status: { $ne: 'Cancelled' } });
         const totalFlights = await Flight.countDocuments();
         const usersCount = await User.countDocuments();
         const revenueResult = await Payment.aggregate([{ $match: { status: 'Success' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]);
@@ -87,7 +97,7 @@ const getAllReservations = async (req, res) => {
 const backupDatabase = async (req, res) => {
     try {
         const flights = await Flight.find();
-        const users = await User.find();
+        const users = await User.find().select('-password');
         const reservations = await Reservation.find();
         const payments = await Payment.find();
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Package, PlusCircle, History, Download, Plane, Users, DollarSign, Activity, AlertCircle, Trash2, Edit, Upload, Settings, LayoutDashboard, CalendarDays, CheckCircle, Search, User as UserIcon, MapPin, Pointer } from 'lucide-react';
+import { Package, PlusCircle, History, Download, Plane, Users, DollarSign, Activity, AlertCircle, Trash2, Edit, Upload, Settings, LayoutDashboard, CalendarDays, CheckCircle, Search, User as UserIcon, MapPin, Pointer, XCircle, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import jsPDF from 'jspdf';
@@ -14,6 +14,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [authVerified, setAuthVerified] = useState(false);
   const [viewPass, setViewPass] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
   const navigate = useNavigate();
 
   // Admin Lists
@@ -26,7 +28,7 @@ const Dashboard = () => {
   const [editFlightId, setEditFlightId] = useState(null);
   const [formData, setFormData] = useState({ flightNumber: '', airline: '', source: '', destination: '', departureTime: '', arrivalTime: '', totalSeats: '', price: '', status: 'Scheduled' });
   const [editUserId, setEditUserId] = useState(null);
-  const [userEditData, setUserEditData] = useState({ firstName: '', lastName: '', email: '', role: '' });
+  const [userEditData, setUserEditData] = useState({ name: '', email: '', role: '' });
   const [msg, setMsg] = useState({ text: '', type: '' });
 
   const [seatViewFlight, setSeatViewFlight] = useState(null);
@@ -173,7 +175,7 @@ const Dashboard = () => {
       e.preventDefault();
       try {
           const token = localStorage.getItem('token');
-          await axios.put(`http://localhost:5000/api/admin/users/${id}`, userEditData, { headers: { Authorization: `Bearer ${token}` }});
+          await axios.put(`http://localhost:5000/api/admin/users/${id}`, { name: userEditData.name, email: userEditData.email, role: userEditData.role }, { headers: { Authorization: `Bearer ${token}` }});
           showMsg('User updated!');
           setEditUserId(null);
           fetchData();
@@ -182,7 +184,7 @@ const Dashboard = () => {
       }
   };
 
-  // --- Seat View & Booking Cancel (Admin) ---
+  // --- Seat View (Admin) ---
   const openSeatView = async (flightId) => {
       try {
           const token = localStorage.getItem('token');
@@ -191,18 +193,6 @@ const Dashboard = () => {
           setSeatViewFlight(flightId);
       } catch(err) {
           showMsg('Error fetching seats', 'error');
-      }
-  };
-
-  const handleAdminCancel = async (resId) => {
-      if(!window.confirm("Cancel this booking? Seats will be released instantly.")) return;
-      try {
-          const token = localStorage.getItem('token');
-          await axios.put(`http://localhost:5000/api/reservations/${resId}/cancel`, {}, { headers: { Authorization: `Bearer ${token}` }});
-          showMsg("Booking cancelled and seats successfully released.");
-          fetchData();
-      } catch(err) {
-          showMsg('Cancellation failed.', 'error');
       }
   };
 
@@ -256,6 +246,35 @@ const Dashboard = () => {
       }
   };
 
+  // --- Passenger Cancel with Refund ---
+  const getRefundInfo = (departureTime, totalAmount) => {
+      const now = new Date();
+      const dep = new Date(departureTime);
+      const hours = (dep - now) / (1000 * 60 * 60);
+      let percent = 0;
+      let tier = 'Tier 3';
+      if (hours > 48) { percent = 90; tier = 'Tier 1'; }
+      else if (hours >= 24) { percent = 50; tier = 'Tier 2'; }
+      return { hours: Math.round(hours * 10) / 10, percent, tier, refundAmount: Math.round((totalAmount * percent) / 100) };
+  };
+
+  const handlePassengerCancel = async () => {
+      if (!cancelTarget) return;
+      setCancelLoading(true);
+      try {
+          const token = localStorage.getItem('token');
+          const res = await axios.put(`http://localhost:5000/api/reservations/${cancelTarget._id}/cancel`, {}, { headers: { Authorization: `Bearer ${token}` }});
+          const refund = res.data.refundAmount;
+          showMsg(refund > 0 ? `Booking cancelled. ₹${refund.toLocaleString('en-IN')} will be refunded.` : 'Booking cancelled. No refund applicable for this tier.');
+          setCancelTarget(null);
+          fetchData();
+      } catch (err) {
+          showMsg(err.response?.data?.message || 'Cancellation failed.', 'error');
+      } finally {
+          setCancelLoading(false);
+      }
+  };
+
   // --- PDF ---
   const generatePDF = (reservation) => {
     const doc = new jsPDF();
@@ -270,39 +289,39 @@ const Dashboard = () => {
   if(!role || !authVerified) return <div className="absolute inset-0 bg-slate-50 flex items-center justify-center text-sky-600 font-bold tracking-widest animate-pulse z-50">AUTHENTICATING SESSION...</div>;
 
   return (
-    <div className="w-full flex h-[calc(100vh-64px)] overflow-hidden bg-slate-50 mt-16 absolute top-0 left-0 text-gray-900">
+    <div className="w-full flex h-[calc(100vh-64px)] overflow-hidden bg-slate-50 mt-16 absolute top-0 left-0 text-slate-900">
       
       {/* -------------------- SIDEBAR MENU -------------------- */}
-      <div className="w-64 bg-white border-r border-gray-200 shadow-sm flex flex-col items-start pt-8 pb-4 h-full z-40 transition-all shrink-0 overflow-y-auto">
-          <div className="px-6 mb-6 w-full text-gray-500 text-xs font-bold uppercase tracking-wider">{role === 'admin' ? 'Admin Panel' : 'User Dashboard'}</div>
+      <div className="w-64 bg-white border-r border-slate-200 shadow-sm flex flex-col items-start pt-8 pb-4 h-full z-40 transition-all shrink-0 overflow-y-auto">
+          <div className="px-6 mb-6 w-full text-slate-500 text-xs font-bold uppercase tracking-wider">{role === 'admin' ? 'Admin Panel' : 'User Dashboard'}</div>
           
           {role === 'admin' ? (
               <>
-                <button onClick={() => setActiveTab('reports')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'reports' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <button onClick={() => setActiveTab('reports')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'reports' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-slate-600 hover:bg-slate-50'}`}>
                     <LayoutDashboard className="w-5 h-5"/> View Reports
                 </button>
-                <button onClick={() => { setActiveTab('manage_flights'); setShowAddForm(false); setEditFlightId(null); setFormData({ flightNumber: '', airline: '', source: '', destination: '', departureTime: '', arrivalTime: '', totalSeats: '', price: '', status: 'Scheduled' }); }} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'manage_flights' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <button onClick={() => { setActiveTab('manage_flights'); setShowAddForm(false); setEditFlightId(null); setFormData({ flightNumber: '', airline: '', source: '', destination: '', departureTime: '', arrivalTime: '', totalSeats: '', price: '', status: 'Scheduled' }); }} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'manage_flights' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-slate-600 hover:bg-slate-50'}`}>
                     <Plane className="w-5 h-5"/> Manage Flights
                 </button>
-                <button onClick={() => setActiveTab('manage_reservations')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'manage_reservations' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-gray-600 hover:bg-gray-100'}`}>
-                    <CalendarDays className="w-5 h-5"/> Manage Reservations
+                <button onClick={() => setActiveTab('manage_reservations')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'manage_reservations' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+                    <CalendarDays className="w-5 h-5"/> View Reservations
                 </button>
-                <button onClick={() => setActiveTab('manage_users')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'manage_users' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <button onClick={() => setActiveTab('manage_users')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'manage_users' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-slate-600 hover:bg-slate-50'}`}>
                     <Users className="w-5 h-5"/> Manage Users
                 </button>
-                <button onClick={() => setActiveTab('backup_restore')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'backup_restore' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <button onClick={() => setActiveTab('backup_restore')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'backup_restore' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-slate-600 hover:bg-slate-50'}`}>
                     <Settings className="w-5 h-5"/> Backup & Restore
                 </button>
               </>
           ) : (
               <>
-                <button onClick={() => setActiveTab('search_flights')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'search_flights' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <button onClick={() => setActiveTab('search_flights')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'search_flights' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-slate-600 hover:bg-slate-50'}`}>
                     <Search className="w-5 h-5"/> Search Flights
                 </button>
-                <button onClick={() => setActiveTab('my_bookings')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'my_bookings' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <button onClick={() => setActiveTab('my_bookings')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'my_bookings' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-slate-600 hover:bg-slate-50'}`}>
                     <CalendarDays className="w-5 h-5"/> Booking History
                 </button>
-                <button onClick={() => setActiveTab('profile')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'profile' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <button onClick={() => setActiveTab('profile')} className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all font-medium ${activeTab === 'profile' ? 'bg-sky-50 text-sky-600 border-r-4 border-sky-600' : 'text-slate-600 hover:bg-slate-50'}`}>
                     <UserIcon className="w-5 h-5"/> Profile
                 </button>
               </>
@@ -312,13 +331,13 @@ const Dashboard = () => {
       {/* -------------------- MAIN CONTENT AREA -------------------- */}
       <div className="flex-1 h-full overflow-y-auto p-4 md:p-8 relative bg-slate-50">
         {seatViewFlight && (
-            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-                <div className="glass p-6 rounded-3xl max-w-lg w-full bg-slate-800 border-2 border-slate-700 relative shadow-2xl animate-in fade-in zoom-in duration-300">
-                    <button onClick={() => setSeatViewFlight(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors w-8 h-8 flex items-center justify-center bg-slate-700/50 rounded-full hover:bg-slate-700">&times;</button>
-                    <h3 className="text-xl font-black text-white text-center mb-6 uppercase tracking-widest border-b border-slate-700 pb-4">Live Seat Analytics</h3>
-                    <div className="flex gap-4 justify-center mb-6 text-xs font-bold uppercase tracking-wider">
-                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" /> <span className="text-emerald-300">Available</span></div>
-                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]" /> <span className="text-red-300">Booked</span></div>
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+                <div className="p-6 rounded-2xl max-w-lg w-full bg-white border border-slate-200 relative shadow-2xl">
+                    <button onClick={() => setSeatViewFlight(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 transition-colors w-8 h-8 flex items-center justify-center bg-slate-100 rounded-full hover:bg-slate-200">&times;</button>
+                    <h3 className="text-xl font-bold text-slate-900 text-center mb-6 uppercase tracking-widest border-b border-slate-200 pb-4">Live Seat Analytics</h3>
+                    <div className="flex gap-4 justify-center mb-6 text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-emerald-500" /> <span>Available</span></div>
+                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-sm bg-red-400" /> <span>Booked</span></div>
                     </div>
                     
                     <div className="max-h-[60vh] overflow-y-auto custom-scrollbar flex flex-col items-center gap-2.5 pb-4 px-2">
@@ -328,62 +347,62 @@ const Dashboard = () => {
                                     {['A', 'B', 'C'].map(col => {
                                         const seatId = `${row}${col}`;
                                         const isBooked = flightSeatsData.bookedSeats.includes(seatId);
-                                        return <div key={seatId} className={`w-8 h-8 md:w-10 md:h-10 rounded-t-lg rounded-b flex items-center justify-center text-[10px] md:text-xs font-black transition-all ${isBooked ? 'bg-red-500/80 border border-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400'}`}>{seatId}</div>
+                                        return <div key={seatId} className={`w-8 h-8 md:w-10 md:h-10 rounded-t-lg rounded-b flex items-center justify-center text-[10px] md:text-xs font-black transition-all ${isBooked ? 'bg-red-400 text-white' : 'bg-emerald-50 border border-emerald-300 text-emerald-600'}`}>{seatId}</div>
                                     })}
                                 </div>
-                                <div className="w-6 h-6 flex items-center justify-center font-bold text-slate-500 text-[10px] bg-slate-900/50 rounded">{row}</div>
+                                <div className="w-6 h-6 flex items-center justify-center font-bold text-slate-400 text-[10px] bg-slate-100 rounded">{row}</div>
                                 <div className="flex gap-1.5">
                                     {['D', 'E', 'F'].map(col => {
                                         const seatId = `${row}${col}`;
                                         const isBooked = flightSeatsData.bookedSeats.includes(seatId);
-                                        return <div key={seatId} className={`w-8 h-8 md:w-10 md:h-10 rounded-t-lg rounded-b flex items-center justify-center text-[10px] md:text-xs font-black transition-all ${isBooked ? 'bg-red-500/80 border border-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400'}`}>{seatId}</div>
+                                        return <div key={seatId} className={`w-8 h-8 md:w-10 md:h-10 rounded-t-lg rounded-b flex items-center justify-center text-[10px] md:text-xs font-black transition-all ${isBooked ? 'bg-red-400 text-white' : 'bg-emerald-50 border border-emerald-300 text-emerald-600'}`}>{seatId}</div>
                                     })}
                                 </div>
                             </div>
                         ))}
                     </div>
-                    <div className="mt-4 pt-4 border-t border-slate-700 w-full text-center">
-                        <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Tail Section</p>
+                    <div className="mt-4 pt-4 border-t border-slate-200 w-full text-center">
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Tail Section</p>
                     </div>
                 </div>
             </div>
         )}
         {/* Toast Notification */}
         {msg.text && (
-            <motion.div initial={{ opacity:0, y:-50 }} animate={{ opacity:1, y:0 }} className={`fixed top-4 right-8 px-6 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-3 backdrop-blur-md border ${msg.type==='error'?'bg-red-500/20 border-red-500/50 text-red-200':'bg-emerald-500/20 border-emerald-500/50 text-emerald-200'}`}>
+            <motion.div initial={{ opacity:0, y:-50 }} animate={{ opacity:1, y:0 }} className={`fixed top-4 right-8 px-6 py-3 rounded-xl shadow-lg z-50 flex items-center gap-3 border ${msg.type==='error'?'bg-red-50 border-red-200 text-red-600':'bg-emerald-50 border-emerald-200 text-emerald-600'}`}>
                 {msg.type === 'error' ? <AlertCircle className="w-5 h-5"/> : <CheckCircle className="w-5 h-5"/>}
                 {msg.text}
             </motion.div>
         )}
 
-        {loading && <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-30 flex items-center justify-center text-blue-400 font-bold tracking-widest animate-pulse">LOADING...</div>}
+        {loading && <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-30 flex items-center justify-center text-sky-600 font-bold tracking-widest animate-pulse">LOADING...</div>}
 
         {/* -------------------- ADMIN VIEWS -------------------- */}
         {role === 'admin' ? (
             <>
               {activeTab === 'reports' && (
                 <div className="animate-in fade-in zoom-in-95 duration-300 max-w-6xl mx-auto">
-                  <h2 className="text-3xl font-extrabold mb-8 text-white flex items-center gap-3"><Activity className="text-blue-400 w-8 h-8"/> System Reports</h2>
+                  <h2 className="text-3xl font-extrabold mb-8 text-slate-900 flex items-center gap-3"><Activity className="text-sky-600 w-8 h-8"/> System Reports</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div className="glass p-6 rounded-2xl border border-blue-500/30 shadow-xl relative overflow-hidden bg-slate-800/40">
-                          <Plane className="absolute top-[-10%] right-[-10%] w-32 h-32 opacity-5 text-blue-400"/>
-                          <h3 className="text-sm font-semibold text-blue-300 uppercase tracking-wider">Total Flights</h3>
-                          <p className="text-5xl font-black mt-3 text-white">{data?.totalFlights || 0}</p>
+                      <div className="p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden bg-white hover:shadow-md transition-shadow">
+                          <Plane className="absolute top-[-10%] right-[-10%] w-32 h-32 opacity-[0.04] text-sky-600"/>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Flights</h3>
+                          <p className="text-4xl font-extrabold mt-3 text-slate-900">{data?.totalFlights || 0}</p>
                       </div>
-                      <div className="glass p-6 rounded-2xl border border-purple-500/30 shadow-xl relative overflow-hidden bg-slate-800/40">
-                          <Users className="absolute top-[-10%] right-[-10%] w-32 h-32 opacity-5 text-purple-400"/>
-                          <h3 className="text-sm font-semibold text-purple-300 uppercase tracking-wider">Total Users</h3>
-                          <p className="text-5xl font-black mt-3 text-white">{data?.usersCount || 0}</p>
+                      <div className="p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden bg-white hover:shadow-md transition-shadow">
+                          <Users className="absolute top-[-10%] right-[-10%] w-32 h-32 opacity-[0.04] text-violet-600"/>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Users</h3>
+                          <p className="text-4xl font-extrabold mt-3 text-slate-900">{data?.usersCount || 0}</p>
                       </div>
-                      <div className="glass p-6 rounded-2xl border border-emerald-500/30 shadow-xl relative overflow-hidden bg-slate-800/40">
-                          <Package className="absolute top-[-10%] right-[-10%] w-32 h-32 opacity-5 text-emerald-400"/>
-                          <h3 className="text-sm font-semibold text-emerald-300 uppercase tracking-wider">Total Bookings</h3>
-                          <p className="text-5xl font-black mt-3 text-white">{data?.totalBookings || 0}</p>
+                      <div className="p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden bg-white hover:shadow-md transition-shadow">
+                          <Package className="absolute top-[-10%] right-[-10%] w-32 h-32 opacity-[0.04] text-emerald-600"/>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Bookings</h3>
+                          <p className="text-4xl font-extrabold mt-3 text-slate-900">{data?.totalBookings || 0}</p>
                       </div>
-                      <div className="glass p-6 rounded-2xl border border-indigo-500/30 shadow-xl relative overflow-hidden bg-slate-800/40">
-                          <DollarSign className="absolute top-[-10%] right-[-10%] w-32 h-32 opacity-5 text-indigo-400"/>
-                          <h3 className="text-sm font-semibold text-indigo-300 uppercase tracking-wider">Revenue</h3>
-                          <p className="text-4xl font-black mt-3 text-white">₹{(data?.revenue || 0).toLocaleString('en-IN')}</p>
+                      <div className="p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden bg-white hover:shadow-md transition-shadow">
+                          <DollarSign className="absolute top-[-10%] right-[-10%] w-32 h-32 opacity-[0.04] text-amber-600"/>
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Revenue</h3>
+                          <p className="text-4xl font-extrabold mt-3 text-emerald-600">₹{(data?.revenue || 0).toLocaleString('en-IN')}</p>
                       </div>
                   </div>
                 </div>
@@ -391,56 +410,56 @@ const Dashboard = () => {
 
               {activeTab === 'manage_flights' && (
                 <div className="animate-in fade-in duration-300 space-y-6 max-w-6xl mx-auto pb-10">
-                   <div className="flex justify-between items-center bg-slate-800/50 p-6 rounded-2xl border border-slate-700 shadow-sm">
-                      <h2 className="text-2xl font-bold flex items-center gap-3"><Plane className="text-blue-400 w-6 h-6"/> Manage Flights</h2>
-                      <button onClick={() => { setShowAddForm(!showAddForm); if(showAddForm){ setEditFlightId(null); setFormData({ flightNumber: '', airline: '', source: '', destination: '', departureTime: '', arrivalTime: '', totalSeats: '', price: '', status: 'Scheduled' });} }} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold flex gap-2 items-center transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)]">
+                   <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                      <h2 className="text-2xl font-bold flex items-center gap-3 text-slate-900"><Plane className="text-sky-600 w-6 h-6"/> Manage Flights</h2>
+                      <button onClick={() => { setShowAddForm(!showAddForm); if(showAddForm){ setEditFlightId(null); setFormData({ flightNumber: '', airline: '', source: '', destination: '', departureTime: '', arrivalTime: '', totalSeats: '', price: '', status: 'Scheduled' });} }} className="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-xl font-bold flex gap-2 items-center transition-all shadow-sm">
                           <PlusCircle className="w-4 h-4"/> {showAddForm ? 'Cancel Form' : 'Add New Flight'}
                       </button>
                    </div>
                    
                    {showAddForm && (
-                      <div className="glass p-8 rounded-2xl border border-blue-500/30 shadow-xl bg-slate-800/80 backdrop-blur-md">
-                          <h3 className="text-xl font-bold mb-6 text-blue-300">{editFlightId ? 'Edit Flight Details' : 'Create New Flight'}</h3>
+                      <div className="p-8 rounded-xl border border-slate-200 shadow-sm bg-white">
+                          <h3 className="text-xl font-bold mb-6 text-slate-900">{editFlightId ? 'Edit Flight Details' : 'Create New Flight'}</h3>
                           <form onSubmit={handleSaveFlight} className="grid grid-cols-1 md:grid-cols-4 gap-5">
                               <div className="flex flex-col space-y-1">
-                                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Flight No</label>
-                                <input type="text" placeholder="e.g. AA101" required value={formData.flightNumber} onChange={(e) => setFormData({...formData, flightNumber: e.target.value})} className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" />
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Flight No</label>
+                                <input type="text" placeholder="e.g. AA101" required value={formData.flightNumber} onChange={(e) => setFormData({...formData, flightNumber: e.target.value})} className="bg-white border border-slate-300 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all" />
                               </div>
                               <div className="flex flex-col space-y-1">
-                                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Airline</label>
-                                <input type="text" placeholder="e.g. AeroServe" required value={formData.airline} onChange={(e) => setFormData({...formData, airline: e.target.value})} className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" />
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Airline</label>
+                                <input type="text" placeholder="e.g. AeroServe" required value={formData.airline} onChange={(e) => setFormData({...formData, airline: e.target.value})} className="bg-white border border-slate-300 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all" />
                               </div>
                               <div className="flex flex-col space-y-1">
-                                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Source</label>
-                                <input type="text" placeholder="City" required value={formData.source} onChange={(e) => setFormData({...formData, source: e.target.value})} className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" />
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Source</label>
+                                <input type="text" placeholder="City" required value={formData.source} onChange={(e) => setFormData({...formData, source: e.target.value})} className="bg-white border border-slate-300 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all" />
                               </div>
                               <div className="flex flex-col space-y-1">
-                                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Destination</label>
-                                <input type="text" placeholder="City" required value={formData.destination} onChange={(e) => setFormData({...formData, destination: e.target.value})} className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" />
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Destination</label>
+                                <input type="text" placeholder="City" required value={formData.destination} onChange={(e) => setFormData({...formData, destination: e.target.value})} className="bg-white border border-slate-300 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all" />
                               </div>
 
                               <div className="flex flex-col space-y-1 md:col-span-2 lg:col-span-1">
-                                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Departure Time</label>
-                                <input type="datetime-local" required value={formData.departureTime} onChange={(e) => setFormData({...formData, departureTime: e.target.value})} className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" />
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Departure Time</label>
+                                <input type="datetime-local" required value={formData.departureTime} onChange={(e) => setFormData({...formData, departureTime: e.target.value})} className="bg-white border border-slate-300 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all" />
                               </div>
                               <div className="flex flex-col space-y-1 md:col-span-2 lg:col-span-1">
-                                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Arrival Time</label>
-                                <input type="datetime-local" required value={formData.arrivalTime} onChange={(e) => setFormData({...formData, arrivalTime: e.target.value})} className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" />
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Arrival Time</label>
+                                <input type="datetime-local" required value={formData.arrivalTime} onChange={(e) => setFormData({...formData, arrivalTime: e.target.value})} className="bg-white border border-slate-300 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all" />
                               </div>
 
                               <div className="flex flex-col space-y-1">
-                                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Seats</label>
-                                <input type="number" required placeholder="Seats" min="1" value={formData.totalSeats} onChange={(e) => setFormData({...formData, totalSeats: e.target.value})} className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" />
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Seats</label>
+                                <input type="number" required placeholder="Seats" min="1" value={formData.totalSeats} onChange={(e) => setFormData({...formData, totalSeats: e.target.value})} className="bg-white border border-slate-300 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all" />
                               </div>
                               <div className="flex flex-col space-y-1">
-                                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Price (₹)</label>
-                                <input type="number" required placeholder="Price" min="0" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" />
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Price (₹)</label>
+                                <input type="number" required placeholder="Price" min="0" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="bg-white border border-slate-300 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all" />
                               </div>
 
                               {editFlightId && (
                                 <div className="flex flex-col space-y-1 md:col-span-4 lg:col-span-2">
-                                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Flight Status</label>
-                                  <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none w-full">
+                                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Flight Status</label>
+                                  <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="bg-white border border-slate-300 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none w-full transition-all">
                                       <option value="Scheduled">Scheduled</option>
                                       <option value="Delayed">Delayed</option>
                                       <option value="Cancelled">Cancelled</option>
@@ -450,7 +469,7 @@ const Dashboard = () => {
                               )}
 
                               <div className={`md:col-span-4 flex justify-end items-end pt-2`}>
-                                <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)]">
+                                <button type="submit" className="bg-sky-600 hover:bg-sky-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-sm">
                                     {editFlightId ? 'Save Edits' : 'Save Flight To DB'}
                                 </button>
                               </div>
@@ -458,35 +477,35 @@ const Dashboard = () => {
                       </div>
                    )}
 
-                   <div className="overflow-x-auto glass rounded-2xl border border-slate-700/50 shadow-xl bg-slate-800/40">
-                       <table className="w-full text-left text-sm text-slate-300">
-                           <thead className="text-xs text-slate-400 uppercase bg-slate-900/80 border-b border-slate-700">
+                   <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
+                       <table className="w-full text-left text-sm text-slate-600">
+                           <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
                                <tr>
                                    <th className="px-6 py-4">Flight</th>
                                    <th className="px-6 py-4">Route</th>
                                    <th className="px-6 py-4">Schedule</th>
                                    <th className="px-6 py-4">Status & Price</th>
-                                   <th className="px-6 py-4 border-l border-slate-700">Actions</th>
+                                   <th className="px-6 py-4 border-l border-slate-200">Actions</th>
                                </tr>
                            </thead>
-                           <tbody className="divide-y divide-slate-700/50">
+                           <tbody className="divide-y divide-slate-100">
                                {flights.slice(0, 100).map(flight => (
-                                   <tr key={flight._id} className="hover:bg-slate-700/40 transition-colors">
-                                      <td className="px-6 py-4 font-bold text-white text-base">{flight.flightNumber} <br/><span className="text-xs text-blue-300 font-medium">{flight.airline}</span></td>
-                                      <td className="px-6 py-4 font-medium">{flight.source} &rarr; {flight.destination}</td>
+                                   <tr key={flight._id} className="hover:bg-slate-50 transition-colors">
+                                      <td className="px-6 py-4 font-bold text-slate-900 text-base">{flight.flightNumber} <br/><span className="text-xs text-sky-600 font-medium">{flight.airline}</span></td>
+                                      <td className="px-6 py-4 font-medium text-slate-700">{flight.source} &rarr; {flight.destination}</td>
                                       <td className="px-6 py-4 text-xs space-y-1">
-                                          <div className="bg-slate-900 px-2 py-1 rounded inline-block text-slate-300"><span className="text-slate-500 mr-1">Dep:</span>{new Date(flight.departureTime).toLocaleString()}</div><br/>
-                                          <div className="bg-slate-900 px-2 py-1 rounded inline-block text-slate-300"><span className="text-slate-500 mr-1">Arr:</span>{new Date(flight.arrivalTime).toLocaleString()}</div>
+                                          <div className="bg-slate-50 px-2 py-1 rounded inline-block text-slate-600 border border-slate-200"><span className="text-slate-400 mr-1">Dep:</span>{new Date(flight.departureTime).toLocaleString()}</div><br/>
+                                          <div className="bg-slate-50 px-2 py-1 rounded inline-block text-slate-600 border border-slate-200"><span className="text-slate-400 mr-1">Arr:</span>{new Date(flight.arrivalTime).toLocaleString()}</div>
                                       </td>
                                       <td className="px-6 py-4">
-                                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${flight.status==='Scheduled'?'bg-emerald-500/10 text-emerald-400':flight.status==='Cancelled'?'bg-red-500/10 text-red-400':flight.status==='Delayed'?'bg-yellow-500/10 text-yellow-400':'bg-slate-500/20 text-slate-300'}`}>{flight.status}</span>
-                                          <div className="text-sm mt-2 text-white font-mono font-bold">₹{flight.price.toLocaleString('en-IN')}</div>
+                                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${flight.status==='Scheduled'?'bg-emerald-50 text-emerald-600 border border-emerald-200':flight.status==='Cancelled'?'bg-red-50 text-red-600 border border-red-200':flight.status==='Delayed'?'bg-amber-50 text-amber-600 border border-amber-200':'bg-slate-100 text-slate-600 border border-slate-200'}`}>{flight.status}</span>
+                                          <div className="text-sm mt-2 text-slate-900 font-mono font-bold">₹{flight.price.toLocaleString('en-IN')}</div>
                                       </td>
-                                      <td className="px-6 py-4 border-l border-slate-700">
-                                          <div className="flex gap-3">
-                                            <button onClick={() => openSeatView(flight._id)} title="View Live Seats" className="p-2.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white rounded-lg transition-colors"><Plane className="w-4 h-4"/></button>
-                                            <button onClick={() => handleEditFlightClick(flight)} title="Edit Flight" className="p-2.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white rounded-lg transition-colors"><Edit className="w-4 h-4"/></button>
-                                            <button onClick={() => handleDeleteFlight(flight._id)} title="Delete Flight" className="p-2.5 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                                      <td className="px-6 py-4 border-l border-slate-200">
+                                          <div className="flex gap-2">
+                                            <button onClick={() => openSeatView(flight._id)} title="View Live Seats" className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-colors border border-emerald-200 hover:border-transparent"><Plane className="w-4 h-4"/></button>
+                                            <button onClick={() => handleEditFlightClick(flight)} title="Edit Flight" className="p-2 bg-sky-50 text-sky-600 hover:bg-sky-600 hover:text-white rounded-lg transition-colors border border-sky-200 hover:border-transparent"><Edit className="w-4 h-4"/></button>
+                                            <button onClick={() => handleDeleteFlight(flight._id)} title="Delete Flight" className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-colors border border-red-200 hover:border-transparent"><Trash2 className="w-4 h-4"/></button>
                                           </div>
                                       </td>
                                    </tr>
@@ -499,46 +518,46 @@ const Dashboard = () => {
 
               {activeTab === 'manage_users' && (
                 <div className="animate-in fade-in duration-300 space-y-6 max-w-6xl mx-auto pb-10">
-                   <h2 className="text-3xl font-bold flex items-center gap-3 mb-8"><Users className="text-purple-400 w-8 h-8"/> Manage Users</h2>
-                   <div className="overflow-x-auto glass rounded-2xl border border-slate-700/50 shadow-xl bg-slate-800/40">
-                       <table className="w-full text-left text-sm text-slate-300">
-                           <thead className="text-xs text-slate-400 uppercase bg-slate-900/80 border-b border-slate-700">
+                   <h2 className="text-3xl font-bold flex items-center gap-3 mb-8 text-slate-900"><Users className="text-violet-600 w-8 h-8"/> Manage Users</h2>
+                   <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
+                       <table className="w-full text-left text-sm text-slate-600">
+                           <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
                                <tr>
                                    <th className="px-6 py-4">Full Name</th>
                                    <th className="px-6 py-4">Email Address</th>
                                    <th className="px-6 py-4">System Role</th>
-                                   <th className="px-6 py-4 border-l border-slate-700">Controls</th>
+                                   <th className="px-6 py-4 border-l border-slate-200">Controls</th>
                                </tr>
                            </thead>
-                           <tbody className="divide-y divide-slate-700/50">
+                           <tbody className="divide-y divide-slate-100">
                                {users.map(user => (
-                                   <tr key={user._id} className="hover:bg-slate-700/40 transition-colors">
+                                   <tr key={user._id} className="hover:bg-slate-50 transition-colors">
                                       {editUserId === user._id ? (
-                                          <td colSpan="4" className="px-6 py-4 backdrop-blur-3xl bg-slate-800/80">
+                                          <td colSpan="4" className="px-6 py-4 bg-sky-50">
                                               <form onSubmit={(e) => handleUpdateUser(e, user._id)} className="flex gap-4 items-center">
-                                                  <input required className="bg-slate-900 border border-slate-600 p-2.5 rounded-lg flex-1 outline-none text-white focus:border-blue-500" value={userEditData.firstName} onChange={e=>setUserEditData({...userEditData, firstName: e.target.value})} placeholder="Name"/>
-                                                  <input required type="email" className="bg-slate-900 border border-slate-600 p-2.5 rounded-lg flex-1 outline-none text-white focus:border-blue-500" value={userEditData.email} onChange={e=>setUserEditData({...userEditData, email: e.target.value})} placeholder="Email"/>
-                                                  <select className="bg-slate-900 border border-slate-600 p-2.5 rounded-lg outline-none text-white focus:border-blue-500" value={userEditData.role} onChange={e=>setUserEditData({...userEditData, role: e.target.value})}>
+                                                  <input required className="bg-white border border-slate-300 p-2.5 rounded-xl flex-1 outline-none text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent" value={userEditData.name} onChange={e=>setUserEditData({...userEditData, name: e.target.value})} placeholder="Name"/>
+                                                  <input required type="email" className="bg-white border border-slate-300 p-2.5 rounded-xl flex-1 outline-none text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent" value={userEditData.email} onChange={e=>setUserEditData({...userEditData, email: e.target.value})} placeholder="Email"/>
+                                                  <select className="bg-white border border-slate-300 p-2.5 rounded-xl outline-none text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-transparent" value={userEditData.role} onChange={e=>setUserEditData({...userEditData, role: e.target.value})}>
                                                       <option value="passenger">Passenger</option>
                                                       <option value="agent">Agent</option>
                                                       <option value="admin">Admin</option>
                                                   </select>
                                                   <div className="flex gap-2">
-                                                    <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-2.5 rounded-lg shadow-lg">Save</button>
-                                                    <button type="button" onClick={() => setEditUserId(null)} className="bg-slate-600 hover:bg-slate-500 text-white font-bold px-5 py-2.5 rounded-lg">Cancel</button>
+                                                    <button type="submit" className="bg-sky-600 hover:bg-sky-700 text-white font-bold px-5 py-2.5 rounded-xl shadow-sm">Save</button>
+                                                    <button type="button" onClick={() => setEditUserId(null)} className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-bold px-5 py-2.5 rounded-xl">Cancel</button>
                                                   </div>
                                               </form>
                                           </td>
                                       ) : (
                                           <>
-                                              <td className="px-6 py-4 font-bold text-white text-base">{user.name || `${user.firstName||''} ${user.lastName||''}`}</td>
-                                              <td className="px-6 py-4 text-slate-300 font-medium">{user.email}</td>
+                                              <td className="px-6 py-4 font-bold text-slate-900 text-base">{user.name || `${user.firstName||''} ${user.lastName||''}`}</td>
+                                              <td className="px-6 py-4 text-slate-600 font-medium">{user.email}</td>
                                               <td className="px-6 py-4">
-                                                  <span className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase ${user.role==='admin'?'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-slate-700/50 text-slate-300 border border-slate-600'}`}>{user.role}</span>
+                                                  <span className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase ${user.role==='admin'?'bg-violet-50 text-violet-600 border border-violet-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>{user.role}</span>
                                               </td>
-                                              <td className="px-6 py-4 flex gap-3 border-l border-slate-700">
-                                                  <button onClick={() => { setEditUserId(user._id); setUserEditData({firstName: user.name, email: user.email, role: user.role}); }} className="p-2.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white rounded-lg transition-colors"><Edit className="w-4 h-4"/></button>
-                                                  <button onClick={() => handleDeleteUser(user._id)} className="p-2.5 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                                              <td className="px-6 py-4 flex gap-2 border-l border-slate-200">
+                                                  <button onClick={() => { setEditUserId(user._id); setUserEditData({name: user.name || `${user.firstName||''} ${user.lastName||''}`.trim(), email: user.email, role: user.role}); }} className="p-2 bg-sky-50 text-sky-600 hover:bg-sky-600 hover:text-white rounded-lg transition-colors border border-sky-200 hover:border-transparent"><Edit className="w-4 h-4"/></button>
+                                                  <button onClick={() => handleDeleteUser(user._id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-colors border border-red-200 hover:border-transparent"><Trash2 className="w-4 h-4"/></button>
                                               </td>
                                           </>
                                       )}
@@ -552,44 +571,46 @@ const Dashboard = () => {
 
               {activeTab === 'manage_reservations' && (
                 <div className="animate-in fade-in duration-300 space-y-6 max-w-6xl mx-auto pb-10">
-                   <h2 className="text-3xl font-bold flex items-center gap-3 mb-8"><CalendarDays className="text-emerald-400 w-8 h-8"/> Detailed Booking Ledger</h2>
-                   <div className="overflow-x-auto glass rounded-2xl border border-slate-700/50 shadow-xl bg-slate-800/40">
-                       <table className="w-full text-left text-sm text-slate-300">
-                           <thead className="text-xs text-slate-400 uppercase bg-slate-900/80 border-b border-slate-700">
+                   <h2 className="text-3xl font-bold flex items-center gap-3 mb-8 text-slate-900"><CalendarDays className="text-emerald-600 w-8 h-8"/> Booking Ledger</h2>
+                   <div className="flex items-center gap-3 px-5 py-3.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-700 text-sm font-medium">
+                       <AlertCircle className="w-5 h-5 flex-shrink-0"/>
+                       <span>This is a <strong>monitoring-only</strong> view. Ticket cancellations are managed by passengers from their own dashboard.</span>
+                   </div>
+                   <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
+                       <table className="w-full text-left text-sm text-slate-600">
+                           <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
                                <tr>
                                    <th className="px-6 py-4">Date & Ref ID</th>
                                    <th className="px-6 py-4">Customer Details</th>
                                    <th className="px-6 py-4">Flight Info & Seats</th>
-                                   <th className="px-6 py-4 border-l border-slate-700">Revenue & Status</th>
+                                   <th className="px-6 py-4 border-l border-slate-200">Revenue & Status</th>
                                </tr>
                            </thead>
-                           <tbody className="divide-y divide-slate-700/50">
+                           <tbody className="divide-y divide-slate-100">
                                {reservations.map(res => (
-                                   <tr key={res._id} className="hover:bg-slate-700/40 transition-colors">
+                                   <tr key={res._id} className="hover:bg-slate-50 transition-colors">
                                       <td className="px-6 py-4 font-mono text-xs font-bold text-slate-400">
-                                        <div className="text-emerald-300 mb-1">{new Date(res.bookingDate || res.createdAt).toLocaleString()}</div>
+                                        <div className="text-slate-900 mb-1 font-sans text-sm font-semibold">{new Date(res.bookingDate || res.createdAt).toLocaleString()}</div>
                                         {res._id}
                                       </td>
                                       <td className="px-6 py-4">
-                                        <div className="font-bold text-white text-base">{res.userId ? (res.userId.name || `${res.userId.firstName} ${res.userId.lastName}`) : '<Deleted User>'}</div>
-                                        <div className="text-xs text-slate-400 mt-1">{res.userId?.email}</div>
+                                        <div className="font-bold text-slate-900 text-base">{res.userId ? (res.userId.name || `${res.userId.firstName} ${res.userId.lastName}`) : '<Deleted User>'}</div>
+                                        <div className="text-xs text-slate-500 mt-1">{res.userId?.email}</div>
                                       </td>
                                       <td className="px-6 py-4 font-medium">
-                                        <div className="text-blue-300 mb-1">{res.flightId?.flightNumber || 'Unknown Flight'}</div>
-                                        <div className="text-white bg-slate-900 px-2 py-1 rounded inline-block text-xs border border-slate-700 mb-2">{res.flightId?.source} &rarr; {res.flightId?.destination}</div>
+                                        <div className="text-sky-600 font-bold mb-1">{res.flightId?.flightNumber || 'Unknown Flight'}</div>
+                                        <div className="text-slate-700 bg-slate-50 px-2 py-1 rounded inline-block text-xs border border-slate-200 mb-2">{res.flightId?.source} &rarr; {res.flightId?.destination}</div>
                                         {res.passengers && res.passengers.length > 0 && (
-                                            <div className="text-xs text-emerald-400 mt-1 font-mono bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 shadow-inner w-max">
+                                            <div className="text-xs text-emerald-600 mt-1 font-mono bg-emerald-50 px-2 py-1 rounded border border-emerald-200 w-max">
                                                 SEATS: {res.passengers.map(p => p.seatNumber || 'Unassigned').join(', ')}
                                             </div>
                                         )}
                                       </td>
-                                      <td className="px-6 py-4 border-l border-slate-700">
-                                          <div className="text-2xl font-black font-mono text-white mb-2">₹{res.totalAmount.toLocaleString('en-IN')}</div>
-                                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase ${res.status==='Confirmed'?'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20':'bg-red-500/10 text-red-400 border border-red-500/20'}`}>{res.status}</span>
-                                          {res.status === 'Confirmed' && (
-                                              <button onClick={() => handleAdminCancel(res._id)} className="block mt-3 px-3 py-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded-md text-xs font-bold transition-all border border-red-500/30 w-max">
-                                                  Cancel Booking
-                                              </button>
+                                      <td className="px-6 py-4 border-l border-slate-200">
+                                          <div className="text-2xl font-extrabold font-mono text-slate-900 mb-2">₹{res.totalAmount.toLocaleString('en-IN')}</div>
+                                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase ${res.status==='Confirmed'?'bg-emerald-50 text-emerald-600 border border-emerald-200':res.status==='Cancelled'?'bg-red-50 text-red-600 border border-red-200':'bg-amber-50 text-amber-600 border border-amber-200'}`}>{res.status}</span>
+                                          {res.refundAmount > 0 && (
+                                              <div className="mt-2 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200 w-max">Refund: ₹{res.refundAmount.toLocaleString('en-IN')}</div>
                                           )}
                                       </td>
                                    </tr>
@@ -602,18 +623,20 @@ const Dashboard = () => {
 
               {activeTab === 'backup_restore' && (
                 <div className="animate-in fade-in duration-300 space-y-6 max-w-4xl mx-auto pt-10 pb-10">
-                   <h2 className="text-3xl font-extrabold flex items-center justify-center gap-3 mb-10"><Settings className="text-slate-400 w-8 h-8"/> Central Database Management</h2>
+                   <h2 className="text-3xl font-extrabold flex items-center justify-center gap-3 mb-10 text-slate-900"><Settings className="text-slate-500 w-8 h-8"/> Database Management</h2>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                       <div className="glass p-10 rounded-3xl border border-slate-700 shadow-2xl flex flex-col items-center text-center bg-slate-800/50 hover:bg-slate-800 transition-colors">
-                           <div className="w-20 h-20 bg-blue-500/20 border border-blue-500/50 rounded-full flex items-center justify-center mb-6"><Download className="w-10 h-10 text-blue-400"/></div>
-                           <h3 className="text-2xl font-black mb-3 text-white">Export Database</h3>
-                           <button onClick={handleBackup} className="w-full mt-6 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-wider rounded-xl transition-all shadow-lg hover:shadow-blue-500/40">Generate JSON Dump</button>
+                       <div className="p-10 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center text-center bg-white hover:shadow-md transition-shadow">
+                           <div className="w-20 h-20 bg-sky-50 border border-sky-200 rounded-full flex items-center justify-center mb-6"><Download className="w-10 h-10 text-sky-600"/></div>
+                           <h3 className="text-2xl font-bold mb-2 text-slate-900">Export Database</h3>
+                           <p className="text-sm text-slate-500 mb-6">Download a full JSON backup of all data</p>
+                           <button onClick={handleBackup} className="w-full py-3.5 bg-sky-600 hover:bg-sky-700 text-white font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm">Generate JSON Dump</button>
                        </div>
-                       <div className="glass p-10 rounded-3xl border border-slate-700 shadow-2xl flex flex-col items-center text-center relative overflow-hidden bg-slate-800/50 hover:bg-slate-800 transition-colors">
+                       <div className="p-10 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center text-center relative overflow-hidden bg-white hover:shadow-md transition-shadow">
                            <input type="file" accept=".json" onChange={handleRestore} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                           <div className="w-20 h-20 bg-emerald-500/20 border border-emerald-500/50 rounded-full flex items-center justify-center mb-6"><Upload className="w-10 h-10 text-emerald-400"/></div>
-                           <h3 className="text-2xl font-black mb-3 text-white">Restore Database</h3>
-                           <button className="w-full mt-6 py-4 bg-slate-700 border border-slate-500 hover:bg-slate-600 text-white font-black uppercase tracking-wider rounded-xl transition-all pointer-events-none relative z-0">Click to Select File</button>
+                           <div className="w-20 h-20 bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center mb-6"><Upload className="w-10 h-10 text-emerald-600"/></div>
+                           <h3 className="text-2xl font-bold mb-2 text-slate-900">Restore Database</h3>
+                           <p className="text-sm text-slate-500 mb-6">Upload a previously exported JSON file</p>
+                           <button className="w-full py-3.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-bold uppercase tracking-wider rounded-xl transition-all pointer-events-none relative z-0">Click to Select File</button>
                        </div>
                    </div>
                 </div>
@@ -625,16 +648,16 @@ const Dashboard = () => {
                
                {activeTab === 'profile' && (
                   <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <h1 className="text-4xl font-extrabold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-300 drop-shadow-md">My Profile</h1>
-                    <div className="glass p-10 rounded-3xl shadow-2xl border border-slate-700/50 bg-slate-800/40 max-w-2xl flex flex-col items-center text-center">
-                        <div className="w-32 h-32 bg-indigo-500/20 rounded-full flex items-center justify-center mb-6 shadow-inner border border-indigo-500/30">
-                            <UserIcon className="w-16 h-16 text-indigo-400"/>
+                    <h1 className="text-3xl font-extrabold mb-8 text-slate-900">My Profile</h1>
+                    <div className="p-10 rounded-xl shadow-sm border border-slate-200 bg-white max-w-2xl flex flex-col items-center text-center">
+                        <div className="w-28 h-28 bg-sky-50 rounded-full flex items-center justify-center mb-6 border border-sky-200">
+                            <UserIcon className="w-14 h-14 text-sky-600"/>
                         </div>
-                        <h2 className="text-3xl font-black text-white">{userName}</h2>
-                        <span className="mt-2 px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30">{role} Account</span>
-                        <div className="mt-8 w-full bg-slate-900/50 p-6 rounded-2xl border border-slate-700 text-left">
-                            <p className="text-slate-400 text-sm mb-1 uppercase font-bold tracking-widest">Email Address</p>
-                            <p className="text-xl text-white font-medium">{userEmail || 'registered@user.com'}</p>
+                        <h2 className="text-3xl font-bold text-slate-900">{userName}</h2>
+                        <span className="mt-2 px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider bg-sky-50 text-sky-600 border border-sky-200">{role} Account</span>
+                        <div className="mt-8 w-full bg-slate-50 p-6 rounded-xl border border-slate-200 text-left">
+                            <p className="text-slate-500 text-xs mb-1 uppercase font-bold tracking-widest">Email Address</p>
+                            <p className="text-xl text-slate-900 font-medium">{userEmail || 'registered@user.com'}</p>
                         </div>
                     </div>
                   </div>
@@ -664,29 +687,29 @@ const Dashboard = () => {
 
                       {availableFlights.length > 0 ? (
                           <div className="flex flex-col gap-6">
-                              <h2 className="text-xl font-bold text-white mb-2 pb-2 border-b border-slate-700/50">Available Flights Found ({availableFlights.length})</h2>
+                              <h2 className="text-xl font-bold text-slate-900 mb-2 pb-2 border-b border-slate-200">Available Flights Found ({availableFlights.length})</h2>
                               {availableFlights.map(flight => (
-                                  <div key={flight._id} className="glass p-6 md:p-8 rounded-3xl flex flex-col md:flex-row justify-between md:items-center gap-6 border border-slate-700/50 bg-slate-800/40 hover:bg-slate-800/70 transition-all shadow-lg">
+                                  <div key={flight._id} className="p-6 md:p-8 rounded-xl flex flex-col md:flex-row justify-between md:items-center gap-6 border border-slate-200 bg-white hover:shadow-md transition-all shadow-sm">
                                      <div className="flex flex-col md:flex-row items-center gap-8">
                                         <div className="text-center w-24">
-                                            <p className="text-3xl font-black text-blue-300 tracking-tight">{new Date(flight.departureTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                                            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">{flight.source}</p>
+                                            <p className="text-3xl font-extrabold text-sky-600 tracking-tight">{new Date(flight.departureTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-1">{flight.source}</p>
                                         </div>
                                         <div className="flex flex-col items-center px-4">
-                                            <p className="text-xs text-slate-500 font-bold tracking-wider mb-2">FLIGHT {flight.flightNumber}</p>
-                                            <div className="w-32 h-px bg-slate-600 relative">
-                                                <Plane className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400 rotate-90" />
+                                            <p className="text-xs text-slate-400 font-bold tracking-wider mb-2">FLIGHT {flight.flightNumber}</p>
+                                            <div className="w-32 h-px bg-slate-300 relative">
+                                                <Plane className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 text-sky-500 rotate-90" />
                                             </div>
-                                            <p className="text-xs text-slate-500 font-bold tracking-wider mt-2">{flight.airline}</p>
+                                            <p className="text-xs text-slate-400 font-bold tracking-wider mt-2">{flight.airline}</p>
                                         </div>
                                         <div className="text-center w-24">
-                                            <p className="text-3xl font-black text-indigo-300 tracking-tight">{new Date(flight.arrivalTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                                            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">{flight.destination}</p>
+                                            <p className="text-3xl font-extrabold text-slate-900 tracking-tight">{new Date(flight.arrivalTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-1">{flight.destination}</p>
                                         </div>
                                      </div>
-                                     <div className="flex items-center justify-between md:flex-col md:items-end md:justify-center border-t md:border-t-0 md:border-l border-slate-700 pt-6 md:pt-0 pl-0 md:pl-8 gap-4">
-                                         <p className="text-4xl font-black text-white font-mono">₹{flight.price.toLocaleString('en-IN')}</p>
-                                         <button onClick={() => navigate(`/book/${flight._id}`)} className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-wider py-3 px-8 rounded-xl flex items-center gap-3 transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)]">
+                                     <div className="flex items-center justify-between md:flex-col md:items-end md:justify-center border-t md:border-t-0 md:border-l border-slate-200 pt-6 md:pt-0 pl-0 md:pl-8 gap-4">
+                                         <p className="text-4xl font-extrabold text-slate-900 font-mono">₹{flight.price.toLocaleString('en-IN')}</p>
+                                         <button onClick={() => navigate(`/book/${flight._id}`)} className="bg-sky-600 hover:bg-sky-700 text-white font-bold uppercase tracking-wider py-3 px-8 rounded-xl flex items-center gap-3 transition-all shadow-sm">
                                             <Pointer className="w-5 h-5"/> Select Flight
                                          </button>
                                      </div>
@@ -695,10 +718,10 @@ const Dashboard = () => {
                           </div>
                       ) : (
                           hasSearched && (
-                              <div className="glass p-12 text-center rounded-3xl border border-slate-700/50 bg-slate-800/40">
-                                  <Plane className="w-16 h-16 mx-auto text-slate-600 mb-4 opacity-50" />
-                                  <h3 className="text-2xl font-bold text-white mb-2">No flights found</h3>
-                                  <p className="text-slate-400">Please try adjusting your search criteria or dates.</p>
+                              <div className="p-12 text-center rounded-xl border border-slate-200 bg-white shadow-sm">
+                                  <Plane className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+                                  <h3 className="text-2xl font-bold text-slate-900 mb-2">No flights found</h3>
+                                  <p className="text-slate-500">Please try adjusting your search criteria or dates.</p>
                               </div>
                           )
                       )}
@@ -707,50 +730,130 @@ const Dashboard = () => {
 
                {activeTab === 'my_bookings' && (
                   <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <h1 className="text-4xl font-extrabold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-300 drop-shadow-md">My Booking History</h1>
+                    <h1 className="text-3xl font-extrabold mb-8 text-slate-900">My Booking History</h1>
                     <div className="flex flex-col gap-6">
                       {data?.length === 0 ? (
-                         <div className="flex justify-center items-center py-24 glass rounded-3xl bg-slate-800/50 border border-slate-700/50">
+                         <div className="flex justify-center items-center py-24 rounded-xl bg-white border border-slate-200 shadow-sm">
                            <div className="text-center">
-                             <History className="w-16 h-16 mx-auto text-slate-600 mb-6"/>
-                             <h3 className="text-2xl font-bold text-white mb-2">No Bookings Yet</h3>
-                             <p className="text-slate-400 mb-6">You haven't booked any flights. Time for an adventure.</p>
-                             <button onClick={() => setActiveTab('search_flights')} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-xl transition-all">Start Searching</button>
+                             <History className="w-16 h-16 mx-auto text-slate-300 mb-6"/>
+                             <h3 className="text-2xl font-bold text-slate-900 mb-2">No Bookings Yet</h3>
+                             <p className="text-slate-500 mb-6">You haven't booked any flights. Time for an adventure.</p>
+                             <button onClick={() => setActiveTab('search_flights')} className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-sm">Start Searching</button>
                            </div>
                          </div>
                       ) : (
                          data?.map((reservation) => (
-                            <div key={reservation._id} className="glass p-8 rounded-3xl flex flex-col md:flex-row justify-between md:items-center gap-6 border border-slate-700/50 bg-slate-800/40 hover:bg-slate-800/70 transition-all shadow-xl">
+                            <div key={reservation._id} className="p-8 rounded-xl flex flex-col md:flex-row justify-between md:items-center gap-6 border border-slate-200 bg-white hover:shadow-md transition-all shadow-sm">
                                <div className="flex-1">
                                  <div className="flex items-center gap-3 mb-2">
-                                    <span className={`px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wider ${reservation.status === 'Confirmed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>{reservation.status}</span>
-                                    <span className="text-slate-500 text-sm font-mono font-bold">Ref: {reservation._id}</span>
+                                    <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${reservation.status === 'Confirmed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>{reservation.status}</span>
+                                    <span className="text-slate-400 text-sm font-mono font-bold">Ref: {reservation._id}</span>
                                  </div>
-                                 <p className="font-extrabold text-3xl text-white tracking-tight">{reservation.flightId?.source}</p>
-                                 <p className="text-slate-500 font-bold text-lg my-1">&darr;</p>
-                                 <p className="font-extrabold text-3xl text-blue-200 tracking-tight">{reservation.flightId?.destination}</p>
-                                 <p className="text-xs text-slate-400 mt-3 font-bold uppercase tracking-widest"><CalendarDays className="inline w-3 h-3 mr-1 -mt-0.5"/> {new Date(reservation.flightId?.departureTime).toLocaleDateString()}</p>
-                                 <p className="text-xs text-indigo-400 mt-1 font-bold uppercase tracking-widest">Booked on: {new Date(reservation.bookingDate || reservation.createdAt).toLocaleDateString()}</p>
+                                 <p className="font-extrabold text-3xl text-slate-900 tracking-tight">{reservation.flightId?.source}</p>
+                                 <p className="text-slate-400 font-bold text-lg my-1">&darr;</p>
+                                 <p className="font-extrabold text-3xl text-sky-600 tracking-tight">{reservation.flightId?.destination}</p>
+                                 <p className="text-xs text-slate-500 mt-3 font-bold uppercase tracking-widest"><CalendarDays className="inline w-3 h-3 mr-1 -mt-0.5"/> {new Date(reservation.flightId?.departureTime).toLocaleDateString()}</p>
+                                 <p className="text-xs text-slate-400 mt-1 font-bold uppercase tracking-widest">Booked on: {new Date(reservation.bookingDate || reservation.createdAt).toLocaleDateString()}</p>
                                </div>
-                               <div className="hidden md:block w-px h-32 bg-slate-700 mx-6"></div>
+                               <div className="hidden md:block w-px h-32 bg-slate-200 mx-6"></div>
                                <div className="text-left md:text-right flex flex-col items-start md:items-end flex-shrink-0">
-                                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Total Paid</p>
-                                 <p className="text-5xl font-mono block font-black text-indigo-400 drop-shadow-sm">₹{reservation.totalAmount.toLocaleString('en-IN')}</p>
-                                 <p className="text-slate-400 text-sm mt-3 font-medium flex items-center gap-2"><Users className="w-4 h-4"/> Passengers: <span className="text-white font-bold">{reservation.passengers?.length}</span></p>
+                                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Paid</p>
+                                 <p className="text-5xl font-mono block font-extrabold text-emerald-600">₹{reservation.totalAmount.toLocaleString('en-IN')}</p>
+                                 <p className="text-slate-500 text-sm mt-3 font-medium flex items-center gap-2"><Users className="w-4 h-4"/> Passengers: <span className="text-slate-900 font-bold">{reservation.passengers?.length}</span></p>
                                  {reservation.passengers && reservation.passengers.length > 0 && (
-                                     <p className="text-emerald-400 text-xs mt-2 font-mono bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 shadow-inner">
+                                     <p className="text-emerald-600 text-xs mt-2 font-mono bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
                                         SEATS: {reservation.passengers.map(p => p.seatNumber || 'Unassigned').join(', ')}
                                      </p>
                                  )}
-                                 <button onClick={() => setViewPass(reservation)} className="bg-sky-600 hover:bg-sky-700 shadow-md mt-5 px-6 py-3 rounded-xl flex gap-3 items-center text-sm font-bold transition-all text-white">
-                                   <Plane className="w-5 h-5" /> View Boarding Pass
-                                 </button>
+                                 <div className="flex gap-3 mt-5 flex-wrap">
+                                   <button onClick={() => setViewPass(reservation)} className="bg-sky-600 hover:bg-sky-700 shadow-sm px-6 py-3 rounded-xl flex gap-3 items-center text-sm font-bold transition-all text-white">
+                                     <Plane className="w-5 h-5" /> View Boarding Pass
+                                   </button>
+                                   {reservation.status === 'Confirmed' && new Date(reservation.flightId?.departureTime) > new Date() && (
+                                     <button onClick={() => setCancelTarget(reservation)} className="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white shadow-sm px-6 py-3 rounded-xl flex gap-3 items-center text-sm font-bold transition-all border border-red-200 hover:border-transparent">
+                                       <XCircle className="w-5 h-5" /> Cancel Ticket
+                                     </button>
+                                   )}
+                                 </div>
+                                 {reservation.status === 'Cancelled' && reservation.refundAmount > 0 && (
+                                   <div className="mt-3 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 w-max">
+                                     Refund: ₹{reservation.refundAmount.toLocaleString('en-IN')}
+                                   </div>
+                                 )}
                                </div>
                             </div>
                          ))
                       )}
                     </div>
                     
+                    {/* Cancellation Confirmation Modal */}
+                    {cancelTarget && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+                               <div className="bg-red-50 border-b border-red-200 px-8 py-6 flex items-center gap-4">
+                                   <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                       <XCircle className="w-6 h-6 text-red-600"/>
+                                   </div>
+                                   <div>
+                                       <h3 className="text-xl font-bold text-slate-900">Cancel Ticket</h3>
+                                       <p className="text-sm text-slate-500 mt-0.5">Review the refund policy before confirming</p>
+                                   </div>
+                                   <button onClick={() => setCancelTarget(null)} className="ml-auto text-slate-400 hover:text-slate-900 transition-colors w-8 h-8 flex items-center justify-center bg-white rounded-full hover:bg-slate-100 border border-slate-200">&times;</button>
+                               </div>
+
+                               <div className="px-8 py-6 space-y-5">
+                                   <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
+                                       <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Flight</p>
+                                       <p className="text-lg font-bold text-slate-900">{cancelTarget.flightId?.source} &rarr; {cancelTarget.flightId?.destination}</p>
+                                       <p className="text-xs text-slate-500 mt-1"><Clock className="inline w-3 h-3 mr-1 -mt-0.5"/> Departing: {new Date(cancelTarget.flightId?.departureTime).toLocaleString()}</p>
+                                   </div>
+
+                                   <div>
+                                       <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Refund Policy Tiers</p>
+                                       <div className="space-y-2">
+                                           {[
+                                             { label: '> 48 hours before departure', refund: '90% Refund', activeBg: 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-200', activeText: 'text-emerald-600', check: (h) => h > 48 },
+                                             { label: '24 – 48 hours before departure', refund: '50% Refund', activeBg: 'bg-amber-50 border-amber-300 ring-2 ring-amber-200', activeText: 'text-amber-600', check: (h) => h >= 24 && h <= 48 },
+                                             { label: '< 24 hours before departure', refund: 'No Refund (0%)', activeBg: 'bg-red-50 border-red-300 ring-2 ring-red-200', activeText: 'text-red-600', check: (h) => h < 24 }
+                                           ].map((t, i) => {
+                                             const info = getRefundInfo(cancelTarget.flightId?.departureTime, cancelTarget.totalAmount);
+                                             const isActive = t.check(info.hours);
+                                             return (
+                                               <div key={i} className={`flex justify-between items-center px-4 py-3 rounded-xl border text-sm ${isActive ? t.activeBg : 'bg-white border-slate-200 opacity-60'}`}>
+                                                 <span className={`font-medium ${isActive ? 'text-slate-900' : 'text-slate-500'}`}>{t.label}</span>
+                                                 <span className={`font-bold ${isActive ? t.activeText : 'text-slate-400'}`}>{t.refund}</span>
+                                               </div>
+                                             );
+                                           })}
+                                       </div>
+                                   </div>
+
+                                   {(() => {
+                                     const info = getRefundInfo(cancelTarget.flightId?.departureTime, cancelTarget.totalAmount);
+                                     return (
+                                       <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 flex items-center justify-between">
+                                         <div>
+                                           <p className="text-xs font-bold text-sky-500 uppercase tracking-wider">Your Estimated Refund</p>
+                                           <p className="text-xs text-slate-500 mt-0.5">{info.hours} hours until departure • {info.tier}</p>
+                                         </div>
+                                         <p className="text-3xl font-extrabold font-mono text-sky-600">₹{info.refundAmount.toLocaleString('en-IN')}</p>
+                                       </div>
+                                     );
+                                   })()}
+                               </div>
+
+                               <div className="px-8 py-5 bg-slate-50 border-t border-slate-200 flex gap-3 justify-end">
+                                   <button onClick={() => setCancelTarget(null)} className="px-6 py-3 bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold rounded-xl transition-all text-sm">
+                                     Keep My Booking
+                                   </button>
+                                   <button onClick={handlePassengerCancel} disabled={cancelLoading} className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-all text-sm shadow-sm disabled:opacity-50 flex items-center gap-2">
+                                     {cancelLoading ? 'Processing...' : 'Confirm Cancellation'}
+                                   </button>
+                               </div>
+                           </motion.div>
+                        </div>
+                    )}
+
                     {/* Visual Boarding Pass Modal */}
                     {viewPass && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 print:bg-white print:p-0 print:backdrop-blur-none">

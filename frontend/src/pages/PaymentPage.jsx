@@ -64,7 +64,7 @@ export default function PaymentPage() {
             <div className="space-y-4 mb-6">
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Flight Number</p>
-                <p className="text-lg font-semibold text-blue-600">{bookingDetails.flightId}</p>
+                <p className="text-lg font-semibold text-sky-600">{bookingDetails.flightId}</p>
               </div>
               
               <div>
@@ -101,7 +101,7 @@ export default function PaymentPage() {
             </Elements>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 h-64 flex flex-col items-center justify-center animate-pulse">
-               <div className="w-12 h-12 border-4 border-sky-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+               <div className="w-12 h-12 border-4 border-sky-200 border-t-sky-600 rounded-full animate-spin mb-4"></div>
                <p className="text-slate-500 font-medium">Securely loading Stripe gateway...</p>
             </div>
           )}

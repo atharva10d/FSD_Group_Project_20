@@ -19,6 +19,7 @@ const reservationSchema = new mongoose.Schema({
     bookingDate: { type: Date, default: Date.now },
     status: { type: String, enum: ['Pending', 'Confirmed', 'Cancelled'], default: 'Pending' },
     paymentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment' },
+    refundAmount: { type: Number, default: 0 },
     isWebCheckedIn: { type: Boolean, default: false }
 }, { timestamps: true });
 

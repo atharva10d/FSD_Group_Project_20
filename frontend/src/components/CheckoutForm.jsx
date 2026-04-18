@@ -66,14 +66,14 @@ export default function CheckoutForm({ bookingDetails }) {
   return (
     <form className="bg-white p-8 rounded-xl shadow-sm border border-slate-200" onSubmit={handleSubmit}>
       <h3 className="text-2xl font-bold text-slate-900 mb-6">Payment Details</h3>
-      <p className="text-slate-600 mb-6 font-medium">Total Amount: <span className="font-bold text-blue-600">${bookingDetails.amount}</span></p>
+      <p className="text-slate-600 mb-6 font-medium">Total Amount: <span className="font-bold text-sky-600">${bookingDetails.amount}</span></p>
       
       <PaymentElement id="payment-element" />
       
       <button 
         disabled={isLoading || !stripe || !elements} 
         id="submit"
-        className="w-full mt-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full mt-8 bg-sky-600 hover:bg-sky-700 text-white font-semibold py-3 px-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span id="button-text">
           {isLoading ? "Processing..." : "Pay Now"}

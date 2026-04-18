@@ -117,7 +117,7 @@ const Booking = () => {
     }
   };
 
-  if (!flight) return <div className="p-10 text-center text-blue-400 font-bold tracking-widest mt-20 animate-pulse">CONNECTING TO FLIGHT RADAR...</div>;
+  if (!flight) return <div className="p-10 text-center text-sky-600 font-bold tracking-widest mt-20 animate-pulse">CONNECTING TO FLIGHT RADAR...</div>;
 
   // Compute Layout rows based on totalSeats (assume 6 columns)
   const totalRows = Math.ceil(flight.totalSeats / 6);
@@ -126,10 +126,10 @@ const Booking = () => {
   return (
     <div className="w-full max-w-7xl mx-auto mt-24 mb-10 px-4">
       {success ? (
-        <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="glass p-12 text-center rounded-3xl max-w-2xl mx-auto bg-emerald-900/20 shadow-[0_0_50px_rgba(16,185,129,0.2)] border border-emerald-500/50">
-          <CheckCircle className="w-24 h-24 mx-auto text-emerald-400 mb-6 drop-shadow-lg" />
-          <h2 className="text-4xl font-black text-white mb-2">Booking Confirmed!</h2>
-          <p className="text-emerald-200/70 font-medium">Payment finalized. Your seats are secured. Redirecting to your dashboard...</p>
+        <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="p-12 text-center rounded-xl max-w-2xl mx-auto bg-white shadow-lg border border-emerald-200">
+          <CheckCircle className="w-24 h-24 mx-auto text-emerald-500 mb-6" />
+          <h2 className="text-4xl font-extrabold text-slate-900 mb-2">Booking Confirmed!</h2>
+          <p className="text-slate-500 font-medium">Payment finalized. Your seats are secured. Redirecting to your dashboard...</p>
         </motion.div>
       ) : (
         <div className="flex flex-col lg:flex-row gap-8 items-start relative">
@@ -146,13 +146,13 @@ const Booking = () => {
                   )}
 
                   <div className="mb-8 flex justify-between items-center bg-slate-50 hover:bg-slate-100 transition-colors p-6 rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
-                    <Plane className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 opacity-[0.03] text-blue-600 pointer-events-none"/>
+                    <Plane className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 opacity-[0.03] text-sky-600 pointer-events-none"/>
                     <div className="relative z-10 flex-1">
-                      <p className="font-black text-3xl text-blue-600 tracking-tight mb-2">
+                      <p className="font-black text-3xl text-sky-600 tracking-tight mb-2">
                           {flight.source} <span className="text-slate-400 font-normal mx-2">&rarr;</span> {flight.destination}
                       </p>
                       <p className="text-slate-500 font-bold uppercase tracking-wider text-sm flex items-center gap-2">
-                          <span className="bg-blue-600 px-2 py-1 rounded text-white shadow-sm">FLIGHT {flight.flightNumber}</span> 
+                          <span className="bg-sky-600 px-2 py-1 rounded text-white shadow-sm">FLIGHT {flight.flightNumber}</span> 
                           • {new Date(flight.departureTime).toLocaleString()} • {flight.airline}
                       </p>
                     </div>
@@ -170,8 +170,8 @@ const Booking = () => {
                     {/* Passengers Section */}
                     <div>
                         <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-2">
-                            <h3 className="text-2xl font-bold flex items-center gap-3 text-slate-900"><Users className="w-6 h-6 text-blue-600"/> Passenger Manifest</h3>
-                            <button type="button" onClick={addPassenger} className="bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white font-bold px-4 py-2 rounded-lg transition-colors border border-blue-200 hover:border-transparent text-sm tracking-wide shadow-sm">
+                            <h3 className="text-2xl font-bold flex items-center gap-3 text-slate-900"><Users className="w-6 h-6 text-sky-600"/> Passenger Manifest</h3>
+                            <button type="button" onClick={addPassenger} className="bg-sky-50 hover:bg-sky-600 text-sky-600 hover:text-white font-bold px-4 py-2 rounded-lg transition-colors border border-sky-200 hover:border-transparent text-sm tracking-wide shadow-sm">
                                 + ADD PASSENGER
                             </button>
                         </div>
@@ -182,21 +182,21 @@ const Booking = () => {
                                 {passengers.length > 1 && (
                                     <button type="button" onClick={() => removePassenger(p.id)} className="absolute -top-3 -right-3 bg-red-500 hover:bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-10">&times;</button>
                                 )}
-                                <div className="md:col-span-1 flex flex-col justify-center items-center bg-slate-900 rounded-lg shadow-sm border border-slate-800">
+                                <div className="md:col-span-1 flex flex-col justify-center items-center bg-slate-50 rounded-lg border border-slate-200">
                                    <span className="text-xs font-black text-slate-400">P-{i+1}</span>
-                                   <span className="text-blue-400 font-bold">{selectedSeats[i] || '--'}</span>
+                                   <span className="text-sky-600 font-bold">{selectedSeats[i] || '--'}</span>
                                 </div>
                                 <div className="md:col-span-8 flex flex-col space-y-1">
                                     <label className="text-xs font-bold text-slate-500 uppercase ml-1">Full Name</label>
-                                    <input type="text" placeholder="John Doe" required value={p.name} onChange={(e)=>updatePassenger(i, 'name', e.target.value)} className="bg-white border border-slate-300 rounded-xl px-4 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent w-full transition-all"/>
+                                    <input type="text" placeholder="John Doe" required value={p.name} onChange={(e)=>updatePassenger(i, 'name', e.target.value)} className="bg-white border border-slate-300 rounded-xl px-4 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent w-full transition-all"/>
                                 </div>
                                 <div className="md:col-span-1 flex flex-col space-y-1">
                                     <label className="text-xs font-bold text-slate-500 uppercase ml-1">Age</label>
-                                    <input type="number" placeholder="25" required min="1" max="120" value={p.age} onChange={(e)=>updatePassenger(i, 'age', e.target.value)} className="bg-white border border-slate-300 rounded-xl px-2 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent w-full text-center transition-all"/>
+                                    <input type="number" placeholder="25" required min="1" max="120" value={p.age} onChange={(e)=>updatePassenger(i, 'age', e.target.value)} className="bg-white border border-slate-300 rounded-xl px-2 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent w-full text-center transition-all"/>
                                 </div>
                                 <div className="md:col-span-2 flex flex-col space-y-1">
                                     <label className="text-xs font-bold text-slate-500 uppercase ml-1">Gender</label>
-                                    <select value={p.gender} onChange={(e)=>updatePassenger(i, 'gender', e.target.value)} className="bg-white border border-slate-300 rounded-xl px-2 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent w-full transition-all">
+                                    <select value={p.gender} onChange={(e)=>updatePassenger(i, 'gender', e.target.value)} className="bg-white border border-slate-300 rounded-xl px-2 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent w-full transition-all">
                                       <option value="Male">Male</option>
                                       <option value="Female">Female</option>
                                       <option value="Other">Other</option>
@@ -209,21 +209,21 @@ const Booking = () => {
                     
                     {/* Payment Section */}
                     <div>
-                        <h3 className="text-2xl font-bold flex items-center gap-3 text-slate-900 mb-4 border-b border-slate-200 pb-2"><CreditCard className="w-6 h-6 text-blue-600"/> Payment Verification</h3>
+                        <h3 className="text-2xl font-bold flex items-center gap-3 text-slate-900 mb-4 border-b border-slate-200 pb-2"><CreditCard className="w-6 h-6 text-sky-600"/> Payment Verification</h3>
                         <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-6">
-                            <select className="bg-white border border-slate-300 p-4 rounded-xl text-slate-900 outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent w-full md:w-1/2 font-bold transition-all" value={paymentMethod} onChange={(e)=>setPaymentMethod(e.target.value)}>
+                            <select className="bg-white border border-slate-300 p-4 rounded-xl text-slate-900 outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent w-full md:w-1/2 font-bold transition-all" value={paymentMethod} onChange={(e)=>setPaymentMethod(e.target.value)}>
                               <option value="Credit Card">Credit Card</option>
                               <option value="Debit Card">Debit Card</option>
                               <option value="PayPal">PayPal Account</option>
                             </select>
-                            <div className="text-xs text-slate-400 bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-inner flex-1">
-                                <span className="font-bold text-blue-400 block mb-1">MOCK ENCRYPTION PROTOCOL</span>
+                            <div className="text-xs text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-200 flex-1">
+                                <span className="font-bold text-sky-600 block mb-1">MOCK ENCRYPTION PROTOCOL</span>
                                 Secure 256-bit AES simulation. Gateway operates with a 10% simulated rejection rate to test fail-safes.
                             </div>
                         </div>
                     </div>
 
-                    <button type="submit" disabled={loading} className="w-full mt-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-4 rounded-xl shadow-sm hover:shadow-md text-xl tracking-widest uppercase transition-all flex items-center justify-center gap-3">
+                    <button type="submit" disabled={loading} className="w-full mt-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white font-bold py-4 rounded-xl shadow-sm hover:shadow-md text-xl tracking-widest uppercase transition-all flex items-center justify-center gap-3">
                       {loading ? 'Authorizing...' : (<><CheckCircle className="w-6 h-6"/> Finalize Booking (₹{(flight.price * passengers.length).toLocaleString('en-IN')})</>)}
                     </button>
                     
@@ -238,7 +238,7 @@ const Booking = () => {
                     <div className="text-center w-full mb-6 border-b border-slate-200 pb-4">
                         <div className="w-16 h-4 bg-slate-300 rounded-full mx-auto mb-4"></div> {/* Nose cockpit window */}
                         <h3 className="text-2xl font-black text-slate-900 tracking-widest uppercase mb-1">Boeing Config</h3>
-                        <p className="text-sm font-bold text-slate-500 mt-1">Select <span className="text-blue-600 text-lg mx-1">{passengers.length}</span> seats</p>
+                        <p className="text-sm font-bold text-slate-500 mt-1">Select <span className="text-sky-600 text-lg mx-1">{passengers.length}</span> seats</p>
                     </div>
                     
                     {/* Legend */}
@@ -293,10 +293,10 @@ const Booking = () => {
                                                 disabled={isBooked}
                                                 onClick={() => handleSeatClick(seatId)}
                                                 title={isBooked ? 'Booked' : `Seat ${seatId}`}
-                                                className={`w-10 h-10 md:w-12 md:h-12 rounded-t-xl rounded-b-md font-mono text-xs font-black transition-all duration-300 flex items-center justify-center select-none
-                                                    ${isBooked ? 'bg-red-500/40 border border-red-500/60 text-red-200/50 cursor-not-allowed' : 
-                                                    isSelected ? 'bg-blue-500 border-2 border-blue-400 text-white shadow-[0_0_15px_rgba(59,130,246,0.6)] scale-110 z-10' : 
-                                                    'bg-slate-900/60 border border-emerald-500/40 text-emerald-500/70 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-emerald-400 hover:scale-105 cursor-pointer'}
+                                                className={`w-10 h-10 md:w-12 md:h-12 rounded-t-xl rounded-b-md font-mono text-xs font-black transition-all duration-300 flex items-center justify-center select-none shadow-sm
+                                                    ${isBooked ? 'bg-red-400 text-white/50 cursor-not-allowed' : 
+                                                    isSelected ? 'bg-blue-500 text-white shadow-md scale-110 z-10' : 
+                                                    'bg-slate-500 hover:bg-slate-600 text-white cursor-pointer hover:scale-105'}
                                                 `}
                                             >
                                                 {seatId}

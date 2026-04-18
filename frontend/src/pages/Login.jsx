@@ -24,6 +24,7 @@ const Login = ({ isRegisterMode = false }) => {
       localStorage.setItem('role', res.data.user.role);
       localStorage.setItem('name', res.data.user.name);
       localStorage.setItem('email', res.data.user.email);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Something went wrong');
@@ -51,7 +52,7 @@ const Login = ({ isRegisterMode = false }) => {
               required 
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
-              className="w-full bg-white border border-slate-300 text-slate-900 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all placeholder:text-slate-500"
+              className="w-full bg-white border border-slate-300 text-slate-900 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent transition-all placeholder:text-slate-500"
             />
           )}
           <input 
@@ -60,7 +61,7 @@ const Login = ({ isRegisterMode = false }) => {
             required 
             value={formData.email}
             onChange={(e) => setFormData({...formData, email: e.target.value})}
-            className="w-full bg-white border border-slate-300 text-slate-900 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all placeholder:text-slate-500"
+            className="w-full bg-white border border-slate-300 text-slate-900 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent transition-all placeholder:text-slate-500"
           />
           <input 
             type="password" 
@@ -68,14 +69,14 @@ const Login = ({ isRegisterMode = false }) => {
             required 
             value={formData.password}
             onChange={(e) => setFormData({...formData, password: e.target.value})}
-            className="w-full bg-white border border-slate-300 text-slate-900 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all placeholder:text-slate-500"
+            className="w-full bg-white border border-slate-300 text-slate-900 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent transition-all placeholder:text-slate-500"
           />
 
           {isRegister && (
             <select 
               value={formData.role} 
               onChange={(e) => setFormData({...formData, role: e.target.value})}
-              className="w-full bg-white border border-slate-300 text-slate-900 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
+              className="w-full bg-white border border-slate-300 text-slate-900 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent transition-all"
             >
               <option value="passenger">Passenger</option>
               <option value="agent">Travel Agent</option>
@@ -84,7 +85,7 @@ const Login = ({ isRegisterMode = false }) => {
 
           <button 
             type="submit" 
-            className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm hover:shadow-md flex items-center justify-center gap-2 transition-all"
+            className="w-full mt-2 bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm hover:shadow-md flex items-center justify-center gap-2 transition-all"
           >
             {isRegister ? <><UserPlus className="w-5 h-5"/> Sign Up</> : <><LogIn className="w-5 h-5"/> Sign In</>}
           </button>
@@ -95,7 +96,7 @@ const Login = ({ isRegisterMode = false }) => {
           <button 
             type="button" 
             onClick={() => { setIsRegister(!isRegister); navigate(isRegister ? '/login' : '/register'); }} 
-            className="ml-2 text-blue-600 hover:text-blue-700 font-bold underline underline-offset-4"
+            className="ml-2 text-sky-600 hover:text-sky-700 font-bold underline underline-offset-4"
           >
             {isRegister ? 'Login here' : 'Register here'}
           </button>

@@ -1,6 +1,7 @@
 const Reservation = require('../models/Reservation');
 const Payment = require('../models/Payment');
 const Flight = require('../models/Flight');
+const Cancellation = require('../models/Cancellation');
 
 const createReservation = async (req, res) => {
     try {
@@ -26,11 +27,10 @@ const createReservation = async (req, res) => {
 
         const totalAmount = flight.price * passengers.length;
 
-        // Mock Payment Gateway
+        // Generate transaction ID for internal records (Stripe handles actual payment)
         const transactionId = 'TXN' + Math.floor(Math.random() * 1000000000);
-        const paymentStatus = Math.random() > 0.1 ? 'Success' : 'Failed'; // 90% success rate
 
-        // Verify chosen seats
+        // Verify chosen seats are not already taken
         const existingReservations = await Reservation.find({ flightId: flightId, status: { $ne: 'Cancelled' } });
         let bookedSeats = [];
         existingReservations.forEach(r => {
@@ -46,10 +46,6 @@ const createReservation = async (req, res) => {
             if (bookedSeats.includes(p.seatNumber)) {
                 return res.status(400).json({ message: `Seat ${p.seatNumber} has already been reserved. Please select another.` });
             }
-        }
-
-        if (paymentStatus === 'Failed') {
-            return res.status(400).json({ message: 'Payment failed. Please try again.' });
         }
 
         const reservation = new Reservation({
@@ -97,23 +93,77 @@ const getMyReservations = async (req, res) => {
 
 const cancelReservation = async (req, res) => {
     try {
-        const reservation = await Reservation.findById(req.params.id);
-        if (!reservation) return res.status(404).json({ message: 'Reservation not found' });
-        if (reservation.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-            return res.status(401).json({ message: 'Not authorized' });
+        const reservation = await Reservation.findById(req.params.id).populate('flightId');
+        if (!reservation) {
+            return res.status(404).json({ message: 'Reservation not found' });
         }
 
+        // Owner-only guard — only the passenger who owns the ticket can cancel
+        if (reservation.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized. Only the ticket owner can cancel this booking.' });
+        }
+
+        // Prevent double cancellation
+        if (reservation.status === 'Cancelled') {
+            return res.status(400).json({ message: 'This booking has already been cancelled.' });
+        }
+
+        const flight = reservation.flightId;
+        if (!flight) {
+            return res.status(404).json({ message: 'Associated flight not found.' });
+        }
+
+        // Check if flight has already departed
+        const now = new Date();
+        const departureTime = new Date(flight.departureTime);
+        if (departureTime <= now) {
+            return res.status(400).json({ message: 'Cannot cancel — this flight has already departed.' });
+        }
+
+        // --- Tiered Refund Calculation ---
+        const hoursUntilDeparture = (departureTime - now) / (1000 * 60 * 60);
+        let refundPercent = 0;
+
+        if (hoursUntilDeparture > 48) {
+            refundPercent = 90;   // Tier 1: > 48 hours
+        } else if (hoursUntilDeparture >= 24) {
+            refundPercent = 50;   // Tier 2: 24–48 hours
+        } else {
+            refundPercent = 0;    // Tier 3: < 24 hours
+        }
+
+        const refundAmount = Math.round((reservation.totalAmount * refundPercent) / 100);
+
+        // Update reservation status and persist refund amount
         reservation.status = 'Cancelled';
+        reservation.refundAmount = refundAmount;
         await reservation.save();
 
-        const flight = await Flight.findById(reservation.flightId);
-        flight.availableSeats += reservation.passengers.length;
-        await flight.save();
+        // Create a Cancellation record for audit trail
+        await Cancellation.create({
+            reservation: reservation._id,
+            user: req.user._id,
+            reason: req.body.reason || 'Passenger initiated cancellation',
+            refundAmount: refundAmount,
+            status: refundAmount > 0 ? 'Refunded' : 'Rejected'
+        });
 
-        res.json({ message: 'Reservation cancelled successfully', reservation });
+        // Release seats back to the flight
+        const flightDoc = await Flight.findById(flight._id);
+        flightDoc.availableSeats += reservation.passengers.length;
+        await flightDoc.save();
+
+        res.json({
+            message: 'Booking cancelled successfully.',
+            reservation,
+            refundAmount,
+            refundPercent,
+            hoursUntilDeparture: Math.round(hoursUntilDeparture * 10) / 10
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
 module.exports = { createReservation, getMyReservations, cancelReservation };
+
